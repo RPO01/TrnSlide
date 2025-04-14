@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tron Light Cycle</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Orbitron', sans-serif;
+            color: #0ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #0ff;
+            box-shadow: 0 0 20px #0ff;
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 10px #0ff;
+        }
+        
+        #gameOver {
+            display: none;
+            position: absolute;
+            font-size: 48px;
+            text-shadow: 0 0 20px #0ff;
+        }
+        
+        #restart {
+            display: none;
+            position: absolute;
+            bottom: 100px;
+            background: #000;
+            color: #0ff;
+            border: 2px solid #0ff;
+            padding: 10px 20px;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            box-shadow: 0 0 10px #0ff;
+        }
+        
+        .grid-line {
+            position: absolute;
+            background: linear-gradient(to bottom, 
+                transparent 0%, 
+                #0066ff 50%,
+                transparent 100%);
+            width: 2px;
+            opacity: 0.3;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="score">ENERGY: 0</div>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <div id="gameOver">PROGRAM TERMINATED</div>
+    <button id="restart">REINITIALIZE</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('gameOver');
+        const restartButton = document.getElementById('restart');
+
+        // Create grid effect
+        function createGrid() {
+            for(let i = 0; i < 50; i++) {
+                const gridLine = document.createElement('div');
+                gridLine.className = 'grid-line';
+                gridLine.style.left = Math.random() * window.innerWidth + 'px';
+                gridLine.style.height = Math.random() * 100 + 50 + 'px';
+                gridLine.style.animation = `fall ${Math.random() * 2 + 2}s linear infinite`;
+                document.body.appendChild(gridLine);
+            }
+        }
+        createGrid();
+
+        // Game state
+        let score = 0;
+        let isGameOver = false;
+        const player = {
+            x: canvas.width / 2 - 15,
+            y: canvas.height - 80,
+            width: 40,
+            height: 20,
+            speed: 6,
+            trail: []
+        };
+
+        let obstacles = [];
+        let trailParticles = [];
+
+        // Controls
+        document.addEventListener('keydown', (e) => {
+            if (isGameOver) return;
+            
+            if (e.key === 'ArrowLeft') {
+                player.x = Math.max(20, player.x - player.speed * 2);
+                addTrail();
+            }
+            if (e.key === 'ArrowRight') {
+                player.x = Math.min(canvas.width - 20 - player.width, player.x + player.speed * 2);
+                addTrail();
+            }
+        });
+
+        function addTrail() {
+            trailParticles.push({
+                x: player.x + player.width/2,
+                y: player.y + player.height,
+                size: 5,
+                alpha: 1
+            });
+        }
+
+        // Game functions
+        function createObstacle() {
+            const types = ['pyramid', 'circle', 'diamond', 'barrier'];
+            obstacles.push({
+                x: Math.random() * (canvas.width - 100) + 50,
+                y: -50,
+                width: 40,
+                height: 40,
+                type: types[Math.floor(Math.random() * types.length)],
+                glow: Math.random() * 0.8 + 0.2
+            });
+        }
+
+        function checkCollision(obstacle) {
+            return player.x < obstacle.x + obstacle.width &&
+                   player.x + player.width > obstacle.x &&
+                   player.y < obstacle.y + obstacle.height &&
+                   player.y + player.height > obstacle.y;
+        }
+
+        function drawLightCycle() {
+            // Main body
+            ctx.fillStyle = '#0ff';
+            ctx.shadowColor = '#0ff';
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(player.x + player.width, player.y);
+            ctx.lineTo(player.x + player.width - 10, player.y + player.height);
+            ctx.lineTo(player.x + 10, player.y + player.height);
+            ctx.closePath();
+            ctx.fill();
+
+            // Trail particles
+            trailParticles = trailParticles.filter(p => {
+                p.alpha -= 0.02;
+                p.size *= 0.98;
+                p.y += 2;
+                
+                ctx.fillStyle = `rgba(0, 255, 255, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                return p.alpha > 0;
+            });
+        }
+
+        function drawObstacle(obstacle) {
+            ctx.fillStyle = `rgba(255, 0, 102, ${obstacle.glow})`;
+            ctx.shadowColor = '#ff0066';
+            ctx.shadowBlur = 15 + obstacle.glow * 20;
+            
+            switch(obstacle.type) {
+                case 'pyramid':
+                    ctx.beginPath();
+                    ctx.moveTo(obstacle.x + obstacle.width/2, obstacle.y);
+                    ctx.lineTo(obstacle.x, obstacle.y + obstacle.height);
+                    ctx.lineTo(obstacle.x + obstacle.width, obstacle.y + obstacle.height);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+                    
+                case 'circle':
+                    ctx.beginPath();
+                    ctx.arc(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height/2, 
+                            obstacle.width/2, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                    
+                case 'diamond':
+                    ctx.beginPath();
+                    ctx.moveTo(obstacle.x + obstacle.width/2, obstacle.y);
+                    ctx.lineTo(obstacle.x, obstacle.y + obstacle.height/2);
+                    ctx.lineTo(obstacle.x + obstacle.width/2, obstacle.y + obstacle.height);
+                    ctx.lineTo(obstacle.x + obstacle.width, obstacle.y + obstacle.height/2);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+                    
+                case 'barrier':
+                    ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, 8);
+                    break;
+            }
+            
+            ctx.shadowBlur = 0;
+        }
+
+        function gameLoop() {
+            if (isGameOver) return;
+
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            ctx.strokeStyle = '#0066ff';
+            ctx.globalAlpha = 0.3;
+            ctx.setLineDash([10, 15]);
+            for(let x = 20; x < canvas.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+
+            // Update obstacles
+            if (Math.random() < 0.015) {
+                createObstacle();
+            }
+
+            obstacles = obstacles.filter(obstacle => {
+                obstacle.y += 2 + Math.min(score/1000, 3);
+                
+                if (checkCollision(obstacle)) {
+                    isGameOver = true;
+                    gameOverElement.style.display = 'block';
+                    restartButton.style.display = 'block';
+                }
+                
+                return obstacle.y < canvas.height;
+            });
+
+            // Draw player
+            drawLightCycle();
+
+            // Draw obstacles
+            obstacles.forEach(obstacle => drawObstacle(obstacle));
+
+            // Update score
+            score++;
+            scoreElement.textContent = `ENERGY: ${score}`;
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Restart game
+        restartButton.addEventListener('click', () => {
+            isGameOver = false;
+            score = 0;
+            obstacles = [];
+            player.x = canvas.width / 2 - 15;
+            gameOverElement.style.display = 'none';
+            restartButton.style.display = 'none';
+            gameLoop();
+        });
+
+        // Start game
+        gameLoop();
+    </script>
+</body>
+</html>
